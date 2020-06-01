@@ -13,6 +13,9 @@
 
 static xQueueHandle i2s_evt_queue = NULL;
 
+extern const uint8_t flac_file_start[] asm("_binary_flac_sample_small_flacc_start");
+extern const uint8_t flac_file_end[] asm("_binary_flac_sample_small_flacc_end");
+
 void init_i2s() {
     i2s_config_t i2s_config = {
         .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
@@ -52,7 +55,7 @@ void app_main(void)
     i2s_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     init_i2s();
     init_gpio();
-    int i = 0;
+
     while (1) {
         if (xQueueReceive(i2s_evt_queue, &num, portMAX_DELAY)) {
             play = !play;

@@ -5,4 +5,6 @@ set(COMPONENT_PRIV_REQUIRES )
 set(COMPONENT_SRCS "main.c")
 set(COMPONENT_ADD_INCLUDEDIRS "")
 
+set(COMPONENT_EMBED_FILES "flac_sample_small.flac")
+
 register_component()
