@@ -1,0 +1,6 @@
+[submodule "components/libsnapcast/libsnapcast"]
+	path = components/libsnapcast/libsnapcast
+	url = https://github.com/bridadan/libsnapcast.git
+[submodule "components/libbuffer/libbuffer"]
+	path = components/libbuffer/libbuffer
+	url = https://github.com/bridadan/libbuffer.git
