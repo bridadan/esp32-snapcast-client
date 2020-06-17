@@ -4,15 +4,20 @@
 #include "driver/i2s.h"
 #include "esp_system.h"
 
-#define SAMPLE_RATE     44100
-#define I2S_NUM         0
-#define I2S_BCK_IO      GPIO_NUM_26
-#define I2S_WS_IO       GPIO_NUM_25
-#define I2S_DO_IO       GPIO_NUM_22
-#define I2S_DI_IO       -1
+#define SAMPLE_RATE     (44100)
+#define I2S_NUM         (0)
+#define WAVE_FREQ_HZ    (100)
+#define PI              (3.14159265)
+#define I2S_BCK_IO      (GPIO_NUM_14)
+#define I2S_WS_IO       (GPIO_NUM_25)
+#define I2S_DO_IO       (GPIO_NUM_26)
+#define I2S_DI_IO       (-1)
 
-#define DMA_BUF_SIZE_MS 20
-#define DMA_BUF_SIZE_BYTES (SAMPLE_RATE  * DMA_BUF_SIZE_MS) / 1000
+#define NUM_CHANNELS 2
+#define BITS_PER_SAMPLE 16
+#define SIZE_OF_SAMPLE (BITS_PER_SAMPLE / 8) // 16 bits / 8 bits == 2 bytes per sample
+#define DMA_BUF_SIZE_MS 5
+#define DMA_BUF_SIZE_BYTES (SAMPLE_RATE * SIZE_OF_SAMPLE * NUM_CHANNELS * DMA_BUF_SIZE_MS) / 1000
 #define DMA_BUF_NUMBER 5
 
 #define DR_FLAC_NO_STDIO
@@ -30,18 +35,24 @@ extern const uint8_t flac_file_end[] asm("_binary_flac_sample_small_flac_end");
 
 void init_i2s() {
     i2s_config_t i2s_config = {
-        .mode = I2S_MODE_MASTER | I2S_MODE_TX | I2S_MODE_DAC_BUILT_IN,
+        .mode = I2S_MODE_MASTER | I2S_MODE_TX,
         .sample_rate = SAMPLE_RATE,
-        .bits_per_sample = 16, /* the DAC module will only take the 8bits from MSB */
+        .bits_per_sample = BITS_PER_SAMPLE, /* the DAC module will only take the 8bits from MSB */
         .channel_format = I2S_CHANNEL_FMT_RIGHT_LEFT,
-        .communication_format = I2S_COMM_FORMAT_I2S_MSB,
+        .communication_format = I2S_COMM_FORMAT_I2S | I2S_COMM_FORMAT_I2S_MSB,
         .intr_alloc_flags = 0, // default interrupt priority
         .dma_buf_count = DMA_BUF_NUMBER,
         .dma_buf_len = DMA_BUF_SIZE_BYTES,
         .use_apll = true
     };
+    i2s_pin_config_t pin_config = {
+        .bck_io_num = I2S_BCK_IO,
+        .ws_io_num = I2S_WS_IO,
+        .data_out_num = I2S_DO_IO,
+        .data_in_num = I2S_PIN_NO_CHANGE,
+    };
     i2s_driver_install(I2S_NUM, &i2s_config, 0, NULL);
-    i2s_set_pin(I2S_NUM, NULL);
+    i2s_set_pin(I2S_NUM, &pin_config);
 }
 
 static unsigned int flac_file_index;
@@ -94,7 +105,8 @@ uint32_t min(uint32_t a, uint32_t b) {
 }
 
 void write_all_to_i2s(drflac_uint64 frames_read) {
-    uint32_t bytes_read = frames_read * 4;
+    uint32_t bytes_read = frames_read * NUM_CHANNELS * SIZE_OF_SAMPLE;
+    //printf("writing %u/%u\n", bytes_read,DMA_BUF_SIZE_BYTES);
     size_t total_bytes_written = 0;
     size_t bytes_written = 0;
     while (total_bytes_written < bytes_read) {
@@ -107,7 +119,7 @@ void write_all_to_i2s(drflac_uint64 frames_read) {
         );
         assert(result == ESP_OK);
         total_bytes_written += bytes_written;
-        printf("total_bytes_written: %u/%u\r\n", total_bytes_written, bytes_read);
+        //printf("total_bytes_written: %u/%u\r\n", total_bytes_written, bytes_read);
     }
 }
 
@@ -116,9 +128,9 @@ void start_flac_stream() {
     flac_file_size = flac_file_end - flac_file_start;
     //printf("flac_file_size %u\r\n", flac_file_size);
     pFlac = drflac_open(&onRead, &onSeek, NULL, NULL);
-    //printf("opened\r\n");
-    uint32_t frames_to_read = DMA_BUF_SIZE_BYTES / 4;
+    uint32_t frames_to_read = (DMA_BUF_SIZE_BYTES / NUM_CHANNELS) / SIZE_OF_SAMPLE;
     drflac_uint64 frames_read = drflac_read_pcm_frames_s16(pFlac, frames_to_read, i2s_buf);
+    printf("frames_to_read: %u, frames_read: %llu\r\n", frames_to_read, frames_read);
     while (frames_read == frames_to_read) {
         write_all_to_i2s(frames_read);
         frames_read = drflac_read_pcm_frames_s16(pFlac, frames_to_read, i2s_buf);
@@ -148,10 +160,15 @@ void app_main(void)
     bool play = true;
     i2s_evt_queue = xQueueCreate(10, sizeof(uint32_t));
     init_i2s();
-    init_gpio();
+    //init_gpio();
 
     start_flac_stream();
+    printf("finished\n");
+    while(1) {
+        vTaskDelay(1000);
+    }
 
+    /*
     while (1) {
         if (xQueueReceive(i2s_evt_queue, &num, portMAX_DELAY)) {
             play = !play;
@@ -162,4 +179,5 @@ void app_main(void)
             }
         }
     }
+    */
 }
