@@ -4,3 +4,6 @@
 [submodule "components/libbuffer/libbuffer"]
 	path = components/libbuffer/libbuffer
 	url = https://github.com/bridadan/libbuffer.git
+[submodule "components/flac/flac"]
+	path = components/flac/flac
+	url = https://github.com/xiph/flac.git
